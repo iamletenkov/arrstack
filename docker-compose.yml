@@ -1,0 +1,159 @@
+version: "3.3"
+
+volumes:
+  torrents:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: /volume1/HomeStorage/arrmedia/torrents
+  films:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: /volume1/HomeStorage/arrmedia/films
+  serials:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: /volume1/HomeStorage/arrmedia/serials
+
+networks:
+  media-network:
+
+services:
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    hostname: homepage
+    restart: always
+    environment:
+      - PUID=1026
+      - PGID=100
+      - LOG_LEVEL=debug
+      - TZ=Europe/Moscow
+      - PORT=9900
+      - HOMEPAGE_ALLOWED_HOSTS=192.168.11.140:9900
+    volumes:
+      - /volume1/docker/arrstack/config/homepage:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # опционально
+      - /volume1/HomeStorage/arrmedia:/mnt/media
+    ports:
+      - 9900:9900
+    networks:
+      - media-network
+
+  qbittorrent:
+    image: linuxserver/qbittorrent:4.4.2
+    # image: linuxserver/qbittorrent:4.6.3
+    container_name: qbittorrent
+    hostname: qbittorrent
+    restart: always
+    environment:
+      - PUID=1026
+      - PGID=100
+      - TZ=Europe/Moscow
+      - WEBUI_PORT=9901
+    volumes:
+      - /volume1/docker/arrstack/config/qbittorrent:/config
+      - torrents:/torrents
+      - serials:/serials
+      - films:/films
+    ports:
+      - 9901:9901
+      - 6881:6881
+      - 6881:6881/udp
+    networks:
+      - media-network
+
+  jackett:
+    image: linuxserver/jackett
+    container_name: jackett
+    hostname: jackett
+    restart: always
+    environment:
+      - PUID=1026
+      - PGID=100
+      - TZ=Europe/Moscow
+    volumes:
+      - /volume1/docker/arrstack/config/jackett:/config
+    ports:
+      - 9902:9117
+    networks:
+      - media-network
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:1.9.4.4039-ls38
+    container_name: prowlarr
+    hostname: prowlarr
+    restart: always
+    environment:
+      - PUID=1026
+      - PGID=100
+      - TZ=Europe/Moscow
+    volumes:
+      - /volume1/docker/arrstack/config/prowlarr:/config
+      - torrents:/torrents
+      - serials:/serials
+      - films:/films
+    ports:
+      - 9903:9696
+    networks:
+      - media-network
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    hostname: sonarr
+    restart: always
+    environment:
+      - PUID=1026
+      - PGID=100
+      - TZ=Europe/Moscow
+    volumes:
+      - /volume1/docker/arrstack/config/sonarr:/config
+      - torrents:/torrents
+      - serials:/serials
+    ports:
+      - 9904:8989
+    networks:
+      - media-network
+  radarr:
+    image: lscr.io/linuxserver/radarr:nightly-5.2.3.8301-ls102
+    container_name: radarr
+    hostname: radarr
+    restart: always
+    environment:
+      - PUID=1026
+      - PGID=100
+      - TZ=Europe/Moscow
+    volumes:
+      - /volume1/docker/arrstack/config/radarr:/config
+      - torrents:/torrents
+      - films:/films
+    ports:
+      - 9905:7878
+    networks:
+      - media-network
+
+  # Plex без ремапа портов: использует стандартные 32400/tcp, 1900/udp, 32410–32414/udp, 32469/tcp
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    hostname: plex
+    restart: always
+    network_mode: host
+    environment:
+      - PUID=1026
+      - PGID=100
+      - TZ=Europe/Moscow
+      - VERSION=docker
+      - PLEX_CLAIM=claim-XAWJhGKxjtAMPa4GsHL5
+    volumes:
+      - /volume1/docker/arrstack/config/plex:/config
+      - films:/data/movies
+      - serials:/data/serials
+
